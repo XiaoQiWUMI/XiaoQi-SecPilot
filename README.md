@@ -6,6 +6,7 @@
 </p>
 
 # 🛡️ XiaoQi SecPilot
+### People with evil intent can do evil things without lying. And not all liars are evil.
 
 **AI-Driven Security Knowledge Copilot — Instant lookup of pentesting techniques, bypass methods, and attack methodologies.**
 
