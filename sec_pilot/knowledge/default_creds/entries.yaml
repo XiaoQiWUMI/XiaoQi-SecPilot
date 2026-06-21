@@ -1,0 +1,168 @@
+# Default Credentials Database — Common system default passwords
+# Category: default_creds
+
+- title: "Web Server Management Defaults"
+  content: |
+    ## Web Server / Management Consoles
+
+    ### Tomcat
+    | Username | Password |
+    |----------|----------|
+    | admin | admin |
+    | tomcat | tomcat |
+    | both | tomcat |
+    | role1 | role1 |
+    | root | root |
+    | manager | manager |
+
+    ### Jenkins
+    | Username | Password |
+    |----------|----------|
+    | admin | admin |
+    | admin | password |
+    | jenkins | jenkins |
+    | admin | jenkins |
+
+    ### WebLogic
+    | Username | Password |
+    |----------|----------|
+    | weblogic | weblogic1 |
+    | weblogic | welcome1 |
+    | system | password |
+    | admin | security |
+
+    ### JBoss
+    | Username | Password |
+    |----------|----------|
+    | admin | admin |
+
+    ### GlassFish
+    | Username | Password |
+    |----------|----------|
+    | admin | adminadmin |
+    | admin | admin |
+
+    ### phpMyAdmin
+    | Username | Password |
+    |----------|----------|
+    | root | (blank) |
+    | root | root |
+    | admin | admin |
+
+    ### WordPress
+    | Username | Password |
+    |----------|----------|
+    | admin | admin |
+    | admin | password |
+    | admin | 123456 |
+  tags: [default-password, tomcat, jenkins, weblogic, jboss, glassfish, phpmyadmin, wordpress, web-server]
+  keywords: [默认口令, tomcat默认密码, jenkins弱口令, weblogic默认, 中间件默认密码, 管理后台弱密码]
+  severity: high
+
+- title: "Database & Infrastructure Defaults"
+  content: |
+    ## Database Default Credentials
+
+    ### MySQL
+    | Username | Password |
+    |----------|----------|
+    | root | (blank) |
+    | root | root |
+    | root | mysql |
+    | root | password |
+
+    ### PostgreSQL
+    | Username | Password |
+    |----------|----------|
+    | postgres | postgres |
+    | postgres | (blank) |
+    | postgres | password |
+
+    ### MSSQL
+    | Username | Password |
+    |----------|----------|
+    | sa | (blank) |
+    | sa | sa |
+    | sa | password |
+
+    ### Oracle
+    | Username | Password |
+    |----------|----------|
+    | system | manager |
+    | sys | change_on_install |
+    | scott | tiger |
+    | dbsnmp | dbsnmp |
+
+    ### MongoDB
+    | Username | Password |
+    |----------|----------|
+    | admin | admin |
+    | admin | (blank) |
+
+    ### Redis
+    | Username | Password |
+    |----------|----------|
+    | (none) | (blank) |
+
+    ## Network Devices
+    | Device | Username | Password |
+    |--------|----------|----------|
+    | Cisco | admin | admin / cisco |
+    | Juniper | root | juniper123 |
+    | Huawei | admin | admin |
+    | H3C | admin | admin |
+
+    ## FTP / SSH
+    | Service | Username | Password |
+    |---------|----------|----------|
+    | FTP | anonymous | anonymous |
+    | FTP | ftp | ftp |
+    | SSH | root | root / toor |
+    | SSH | admin | admin |
+  tags: [default-password, mysql, postgresql, mssql, oracle, mongodb, redis, cisco, ftp, ssh]
+  keywords: [数据库默认口令, mysql弱密码, oracle默认, redis未授权, ftp匿名, ssh弱口令]
+  severity: high
+
+- title: "Educational Platform Defaults"
+  content: |
+    ## Educational Systems (Common in .edu.cn)
+
+    ### Online Learning (教务/学习通/智慧树)
+    ```
+    admin/admin, admin/123456, admin/admin123
+    admin/12345678, admin/password
+    jwc/jwc123, jwc/admin888
+    admin/<school_pinyin>123  (e.g., admin/hnlg123)
+    ```
+
+    ### VPN / SSO
+    ```
+    <student_id>/<student_id>
+    <student_id>/123456
+    <student_id>/<id_number_last_6>
+    <teacher_id>/123456
+    ```
+
+    ### Library / E-Resources
+    ```
+    lib/lib123, library/library, tushuguan/tushuguan
+    reader/reader, guest/guest
+    ```
+
+    ### Cloud Desktop / Lab
+    ```
+    admin/admin, admin/123456, admin/admin888
+    student/student, student/123456
+    ```
+
+    ### Common Pattern Summary
+    ```
+    Pattern 1: username = password
+    Pattern 2: username/123456
+    Pattern 3: admin/admin + suffix (admin888, admin123, etc.)
+    Pattern 4: <org_abbr>/<org_abbr> + 123 (e.g., whu/whu123)
+    Pattern 5: ID-based: student ID + last 6 digits of ID card
+    ```
+  tags: [default-password, education, university, portal, sso, library, vpn]
+  keywords: [教育系统默认口令, 教务系统, 统一认证, 图书馆, vpn默认口令, 校园网]
+  severity: medium

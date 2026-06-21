@@ -1,0 +1,169 @@
+# Penetration Testing Methodology — Complete workflows & checklists
+# Category: methodology
+
+- title: "Black-Box Pentest — 6-Phase Methodology"
+  content: |
+    ## Complete Black-Box Testing Workflow
+
+    ### Phase 1: Information Gathering
+    1. Subdomain enumeration (subfinder + amass + crt.sh)
+    2. Port scanning (nmap -sC -sV top ports)
+    3. Technology fingerprinting (Wappalyzer, WhatWeb, BuiltWith)
+    4. JS endpoint extraction (katana + LinkFinder)
+    5. Parameter discovery (Arjun + Wayback/CommonCrawl)
+    6. Directory brute-forcing (ffuf recursive)
+    7. WHOIS / DNS record analysis
+
+    ### Phase 2: Attack Surface Mapping
+    1. Categorize by technology (CMS, framework, custom)
+    2. Identify authentication endpoints (login, register, SSO, OAuth)
+    3. Map API endpoints (REST, GraphQL, WebSocket)
+    4. Identify file upload features
+    5. Find search/query parameters
+    6. Map user roles & privilege levels
+    7. Catalog third-party integrations
+
+    ### Phase 3: Vulnerability Analysis
+    **Authentication:**
+    - Default credentials
+    - Weak password policy
+    - JWT/OAuth misconfigurations
+    - Session management flaws
+    - MFA bypass
+
+    **Injection:**
+    - SQL injection (all params)
+    - XSS (reflected → stored → DOM)
+    - SSTI (template engines)
+    - XXE (XML inputs)
+    - Command injection
+    - CRLF injection
+    - LDAP injection
+
+    **Access Control:**
+    - IDOR (horizontal/vertical)
+    - Forced browsing (hidden endpoints)
+    - CORS misconfiguration
+    - Missing authorization on APIs
+
+    **File Handling:**
+    - Unrestricted file upload
+    - Path traversal (LFI/RFI)
+    - Arbitrary file read/write
+
+    **Business Logic:**
+    - Race conditions
+    - Mass assignment
+    - Parameter tampering
+    - Workflow bypass
+
+    ### Phase 4: Exploitation
+    1. Prioritize by severity & ease
+    2. Develop PoC (keep it reproducible)
+    3. Chain vulnerabilities (e.g., XSS → CSRF → privilege escalation)
+    4. Document every attack step
+    5. Capture screenshots/evidence
+
+    ### Phase 5: Reporting
+    1. Title: Concise, descriptive
+    2. Severity: CVSS 3.1 scoring
+    3. Steps to reproduce: Step-by-step, clear
+    4. Impact: What an attacker can achieve
+    5. Remediation: Actionable fix
+
+    ### Phase 6: Retesting
+    1. Verify fixes are applied
+    2. Check for bypasses of the fix
+    3. Re-test related functionality
+  tags: [methodology, blackbox, pentesting, workflow, checklist, information-gathering, exploitation, reporting]
+  keywords: [渗透测试方法, 黑盒测试, 工作流程, 6阶段, 信息收集, 漏洞分析, 报告]
+  severity: info
+
+- title: "Education Vulnerability Scoring Standards"
+  content: |
+    ## Education Vulnerability Report Scoring
+
+    ### Severity Levels
+    | Level | CVSS | Description |
+    |-------|------|-------------|
+    | **Critical** | 9.0-10.0 | Direct access to core data (student info, grades, personal data), system takeover |
+    | **High** | 7.0-8.9 | Sensitive data exposure, auth bypass, privilege escalation |
+    | **Medium** | 4.0-6.9 | Limited data exposure, CSRF, stored XSS |
+    | **Low** | 0.1-3.9 | Information disclosure, clickjacking, reflected XSS (limited) |
+
+    ### Ignore Rules (Usually Not Accepted)
+    - Self-XSS (requires victim to paste code)
+    - Clickjacking without sensitive actions
+    - Missing security headers (HSTS, CSP, X-Frame-Options alone)
+    - Rate limiting issues on login (unless severe)
+    - Version disclosure without exploitation proof
+    - Open redirect without chaining
+    - CSRF on logout
+    - Username enumeration on login (unless sensitive context)
+
+    ### What Matters Most
+    1. **Reproducibility** — step-by-step proof
+    2. **Impact** — what can an attacker actually achieve?
+    3. **Sensitivity** of affected data
+    4. **Scalability** — does it affect many users/systems?
+    5. **Chainability** — can it be part of a larger attack?
+
+    ### Log Sources Used to Verify
+    - ACCESS logs (IP, timestamp, user-agent)
+    - OPERATION logs (action, target, result)
+    - Be prepared to provide these on submission
+  tags: [scoring, cvss, education, vulnerability-reporting, severity, ignore-rules]
+  keywords: [漏洞评分, 教育平台, cvss, 严重等级, 忽略规则, 提交标准]
+  severity: info
+
+- title: "Report Template (Education Platform)"
+  content: |
+    ## Vulnerability Report Template
+
+    ### Title Format
+    ```
+    [Vulnerability Type] in [Module/System] allows [Impact]
+    Example: SQL Injection in /api/student/query allows unauthorized data access
+    ```
+
+    ### Report Structure
+    ```markdown
+    ## Vulnerability Description
+    Brief description (1-2 sentences)
+
+    ## Affected URL/Endpoint
+    https://target.edu.cn/api/v1/student/query
+
+    ## Vulnerability Type
+    SQL Injection (Critical)
+
+    ## Reproduction Steps
+    1. Visit https://target.edu.cn/api/v1/student/query
+    2. Input payload: ' UNION SELECT 1,2,3 --
+    3. Observe: Student data returned from other tables
+    4. Confirm: Database information exposed
+
+    ## Proof of Concept
+    [Screenshot showing attack result]
+    [Request/response evidence]
+    [Access log evidence if applicable]
+
+    ## Impact
+    - Unauthorized access to all student records
+    - Potential to modify academic data
+    - Affects N users
+
+    ## CVSS 3.1 Score
+    AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N → 9.1 (Critical)
+
+    ## Remediation
+    1. Use parameterized queries
+    2. Implement WAF rules
+    3. Input validation
+
+    ## Additional Notes
+    [Any chaining opportunities, edge cases, etc.]
+    ```
+  tags: [report, template, education-platform, cvss, submission]
+  keywords: [报告模板, 提交模板, 漏洞报告, 教育平台提交, cvss评分]
+  severity: info

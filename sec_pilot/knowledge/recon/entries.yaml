@@ -1,0 +1,261 @@
+# Reconnaissance — Information gathering & attack surface mapping
+# Category: recon
+
+- title: "Subdomain Enumeration — Complete Pipeline"
+  content: |
+    ## Subdomain Discovery Pipeline
+
+    ### Passive Sources
+    ```bash
+    # Certificate Transparency
+    curl -s "https://crt.sh/?q=%25.target.com&output=json" | jq -r '.[].name_value' | sort -u
+
+    # DNS Dumpster
+    curl -s "https://dnsdumpster.com/"  # requires CSRF token
+
+    # SecurityTrails (API)
+    curl -s "https://api.securitytrails.com/v1/domain/target.com/subdomains" \
+      -H "APIKEY: YOUR_KEY"
+
+    # AlienVault OTX
+    curl -s "https://otx.alienvault.com/api/v1/indicators/domain/target.com/passive_dns"
+
+    # RapidDNS
+    curl -s "https://rapiddns.io/subdomain/target.com?full=1"
+    ```
+
+    ### Tool-Based
+    ```bash
+    subfinder -d target.com -o subs.txt
+    assetfinder --subs-only target.com | tee -a subs.txt
+    amass enum -passive -d target.com -o subs.txt
+    findomain -t target.com -o subs.txt
+    ```
+
+    ### Bruteforce
+    ```bash
+    # With wordlists
+    puredns bruteforce wordlist.txt target.com -r resolvers.txt
+    shuffledns -d target.com -w wordlist.txt -r resolvers.txt
+
+    # Resolution
+    puredns resolve subs.txt -r resolvers.txt -w resolved.txt
+    ```
+
+    ### Permutation/Alt Discovery
+    ```bash
+    # Generate alt domains
+    altdns -i subs.txt -o alts.txt -w words.txt
+    gotator -sub subs.txt -perm permutations.txt -o got.txt
+
+    # Resolve alts
+    puredns resolve alts.txt -w resolved-alts.txt
+    ```
+  tags: [subdomain, recon, passive, dns, certificate-transparency, amass, subfinder]
+  keywords: [子域名, 被动收集, 证书透明度, dns, 子域名爆破, 资产发现]
+  severity: info
+  references:
+    - https://github.com/projectdiscovery/subfinder
+    - https://github.com/owasp-amass/amass
+
+- title: "JS Analysis — Hidden Endpoint Extraction"
+  content: |
+    ## JavaScript Endpoint Extraction Pipeline
+
+    ### 1. Collect JS Files
+    ```bash
+    # Via katana
+    katana -u https://target.com -jc -o js_urls.txt
+
+    # Via subjs
+    subjs -i urls.txt -o js_files.txt
+
+    # Via gau/wayback
+    gau target.com | grep '\.js$' | sort -u > js_files.txt
+
+    # Via hakrawler
+    hakrawler -url target.com -depth 3 -js -plain
+    ```
+
+    ### 2. Extract Endpoints
+    ```bash
+    # LinkFinder
+    python3 linkfinder.py -i target.js -o cli
+
+    # GoLinkFinder
+    GoLinkFinder -f target.js -o endpoints.txt
+
+    # JSner
+    jsner -f target.js -o endpoints.txt
+
+    # Manual regex patterns
+    cat *.js | grep -oP '"[^"]*api[^"]*"'
+    cat *.js | grep -oP '/[a-zA-Z0-9_/-]+/[a-zA-Z0-9_/-]+'
+    cat *.js | grep -oP 'https?://[^"'"'"' ]*'
+    ```
+
+    ### 3. Sensitive Data in JS
+    ```bash
+    # API keys & tokens
+    cat *.js | grep -iE 'api[_-]?key|token|secret|password|auth|bearer'
+    cat *.js | grep -oP '[a-zA-Z0-9_]{20,}' | sort -u
+
+    # Internal URLs
+    cat *.js | grep -oP 'https?://[a-z.-]+\.internal[^"'"'"' ]*'
+    cat *.js | grep -oP 'https?://[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+[^"'"'"' ]*'
+
+    # Source maps
+    curl https://target.com/static/app.js.map -o app.js.map
+    ```
+
+    ### 4. Automated Pipeline
+    ```bash
+    for url in $(cat alive_hosts.txt); do
+      katana -u "$url" -jc -silent | grep '\.js$' | anew js_urls.txt
+    done
+    cat js_urls.txt | httpx -mc 200 -silent | anew live_js.txt
+    # Download all
+    mkdir -p js_dump && cd js_dump
+    cat ../live_js.txt | parallel -j5 'wget -q {}'
+    # Extract all
+    find . -name "*.js" -exec python3 /path/to/LinkFinder/linkfinder.py -i {} -o cli \; | anew endpoints.txt
+    ```
+  tags: [js-analysis, endpoints, linkfinder, api-discovery, katana, sensitive-data]
+  keywords: [js分析, 接口发现, api端点, linkfinder, 静态资源, 敏感信息泄露]
+  severity: info
+  references:
+    - https://github.com/GerbenJavado/LinkFinder
+    - https://github.com/projectdiscovery/katana
+
+- title: "Parameter Discovery — Full Toolkit"
+  content: |
+    ## Parameter Discovery Methodology
+
+    ### Passive Collection
+    ```bash
+    # Wayback Machine
+    echo target.com | waybackurls | unfurl keys | sort -u
+
+    # CommonCrawl
+    cc.py -d target.com -o urls.txt
+    cat urls.txt | unfurl keys | sort -u > params.txt
+
+    # AlienVault OTX
+    curl -s "https://otx.alienvault.com/api/v1/indicators/domain/target.com/url_list" \
+      | jq -r '.url_list[].url' | unfurl keys | sort -u
+
+    # gau
+    gau target.com | unfurl keys | sort -u
+    ```
+
+    ### Active Discovery Tools
+    ```bash
+    # Arjun
+    arjun -u https://target.com/endpoint -m GET
+    arjun -u https://target.com/endpoint -m POST --include='{"id":1}'
+
+    # Param Miner (Burp Extension)
+    # Right Click → Extensions → Param Miner → Guess params
+
+    # ffuf parameter fuzzing
+    ffuf -u 'https://target.com/api/FUZZ' -w params.txt -mc 200,403
+    ffuf -u 'https://target.com/api?FUZZ=test' -w params.txt -mc 200
+
+    # x8 (hidden parameter discovery)
+    x8 -u https://target.com/endpoint -w params.txt
+    ```
+
+    ### Cache-Related Parameter Discovery
+    ```bash
+    # ParamPamPam
+    parampp -u https://target.com -o output.txt
+
+    # Cache poisoning params to test
+    # utm_source, utm_campaign, callback, jsonp, cb, redirect, url, next, return
+    ```
+
+    ### Interesting Parameters
+    ```
+    redirect=, url=, next=, return=, returnTo=, goto=,
+    file=, path=, template=, view=, page=,
+    id=, user=, account=, uid=, uuid=,
+    q=, query=, search=, filter=, sort=,
+    format=, type=, output=,
+    admin=, debug=, test=, dev=,
+    token=, csrf=, nonce=,
+    callback=, jsonp=,
+    ```
+  tags: [parameter-discovery, arjun, ffuf, wayback, fuzzing, cache-poisoning]
+  keywords: [参数发现, 参数爆破, arjun, 隐式参数, 回调参数, 参数收集]
+  severity: info
+  references:
+    - https://github.com/s0md3v/Arjun
+    - https://github.com/tomnomnom/unfurl
+
+- title: "Directory & File Brute-Forcing"
+  content: |
+    ## Directory Brute-Forcing Toolkit
+
+    ### Tools
+    ```bash
+    # ffuf (recommended — fast, flexible)
+    ffuf -u https://target.com/FUZZ -w wordlist.txt -mc 200,301,302,403
+
+    # Dirsearch (recursive)
+    dirsearch -u https://target.com -e php,asp,aspx,jsp,html,zip,bak --recursive
+
+    # Feroxbuster (recursive, fast)
+    feroxbuster -u https://target.com -w wordlist.txt -t 50
+
+    # Gobuster
+    gobuster dir -u https://target.com -w wordlist.txt -x php,html,txt
+
+    # Nuclei (workflow-based)
+    nuclei -u https://target.com -t workflows/dir-enum.yaml
+    ```
+
+    ### Recursive Strategy
+    ```bash
+    # First pass: top-level
+    ffuf -u https://target.com/FUZZ -w top10000.txt -o first_pass.json
+
+    # Extract discovered dirs
+    cat first_pass.json | jq -r '.results[] | select(.status==301 or .status==200) | .input.FUZZ'
+
+    # Second pass: inside each discovered dir
+    for dir in $(cat discovered_dirs.txt); do
+      ffuf -u "https://target.com/$dir/FUZZ" -w wordlist.txt
+    done
+    ```
+
+    ### File Extension Strategy
+    ```
+    Priority order:
+    .php, .asp, .aspx, .jsp, .do, .action
+    .bak, .old, .orig, .save, .swp, ~
+    .zip, .tar.gz, .sql, .7z
+    .log, .txt, .md, .json, .xml, .yml
+    .git/config, .env, .DS_Store
+    ```
+
+    ### Sensitive Files Checklist
+    ```
+    /.git/HEAD
+    /.env
+    /wp-config.php
+    /config.php
+    /backup.zip
+    /database.sql
+    /phpinfo.php
+    /debug/
+    /.vscode/
+    /.idea/
+    /WEB-INF/web.xml
+    /robots.txt
+    /sitemap.xml
+    /crossdomain.xml
+    /clientaccesspolicy.xml
+    ```
+  tags: [directory-brute-force, ffuf, dirsearch, feroxbuster, sensitive-files]
+  keywords: [目录爆破, 文件发现, ffuf, dirsearch, 敏感文件, 递归扫描]
+  severity: info

